@@ -1,4 +1,5 @@
 import os
+import shutil
 import uuid
 import sys
 import webview
@@ -20,6 +21,9 @@ import bg_removal
 
 app = FastAPI()
 
+PORT = int(os.environ.get("PORT", "8000"))
+URL = f"http://127.0.0.1:{PORT}"
+
 TMP_DIR = Path("tmp")
 TMP_DIR.mkdir(exist_ok=True)
 
@@ -39,7 +43,7 @@ def get_static_path():
 
 def run_server():
     # We run uvicorn in a function so we can put it in a background thread
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
 
 
 # --- Image Processing Functions ---
@@ -265,12 +269,43 @@ async def export(body: dict):
     return {"status": "ok"}
 
 
+class Api:
+    """Methods exposed to the page as window.pywebview.api.* in the desktop window.
+
+    The native webview ignores <a download>, so saving goes through a Save dialog.
+    """
+
+    def save_final(self, session_id: str):
+        src = TMP_DIR / session_id / "final.jpg"
+        if not src.exists():
+            return {"ok": False, "error": "Final image not found"}
+        result = webview.windows[0].create_file_dialog(
+            webview.FileDialog.SAVE, save_filename="passport-photo.jpg"
+        )
+        if not result:
+            return {"ok": False, "cancelled": True}
+        dest = result if isinstance(result, str) else result[0]
+        try:
+            shutil.copyfile(src, dest)
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "path": dest}
+
+
 if __name__ == "__main__":
+    if "--browser" in sys.argv:
+        # Run without the desktop window and open the UI in the default browser
+        import webbrowser
+
+        threading.Timer(1.0, webbrowser.open, args=[URL]).start()
+        run_server()
+        sys.exit(0)
+
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
     window = webview.create_window(
-        "Passport Photo Tool", "http://127.0.0.1:8000", width=800, height=600
+        "Passport Photo Tool", URL, width=800, height=600, js_api=Api()
     )
 
     webview.start()

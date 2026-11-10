@@ -43,6 +43,24 @@ uv sync
 uv run main.py
 ```
 
+### Running in a browser
+
+To use your regular browser instead of the desktop window:
+
+```sh
+uv run main.py --browser
+```
+
+This starts the local server and opens the app at http://127.0.0.1:8000 in your default browser. Stop it with Ctrl+C.
+
+The server uses port 8000 by default. If that port is busy (for example, the installed app is open), set `PORT`:
+
+```sh
+PORT=8123 uv run main.py --browser
+```
+
+`PORT` also works without `--browser` for the desktop window.
+
 ### Building
 
 ```sh
